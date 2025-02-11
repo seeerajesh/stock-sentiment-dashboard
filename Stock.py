@@ -4,8 +4,8 @@ import yfinance as yf
 
 # Function to fetch top 300 NSE stocks from Yahoo Finance
 def fetch_stock_data():
-    # Fetch NIFTY 500 stocks
-    nifty500_tickers = ["RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS", "ICICIBANK.NS"]  # Replace with top 300 tickers
+    # Fetch top 300 NSE stocks dynamically
+    nifty500_tickers = [ticker + ".NS" for ticker in pd.read_html("https://en.wikipedia.org/wiki/NIFTY_500")[1]["Symbol"].head(300).tolist()]
     
     stock_data = []
     for ticker in nifty500_tickers:
@@ -17,9 +17,9 @@ def fetch_stock_data():
             "Price": stock.info.get("currentPrice", None),
             "52W High": stock.info.get("fiftyTwoWeekHigh", None),
             "52W Low": stock.info.get("fiftyTwoWeekLow", None),
-            "Volume": hist["Volume"].iloc[-1],
-            "9 Day MA": hist["Close"].rolling(window=9).mean().iloc[-1],
-            "50 Day MA": hist["Close"].rolling(window=50).mean().iloc[-1],
+            "Volume": hist["Volume"].iloc[-1] if not hist.empty else None,
+            "9 Day MA": hist["Close"].rolling(window=9).mean().iloc[-1] if not hist.empty else None,
+            "50 Day MA": hist["Close"].rolling(window=50).mean().iloc[-1] if not hist.empty else None,
             "Futures Price": None,  # Placeholder for F&O data
             "Options Price": None,  # Placeholder for F&O data
             "Sentiment Score": None,  # Placeholder for sentiment analysis
