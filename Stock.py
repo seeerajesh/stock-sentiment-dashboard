@@ -2,32 +2,50 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 
-# Function to fetch top 300 NSE stocks from Yahoo Finance
+# List of top 300 NSE stocks (replace with actual tickers)
+nifty500_tickers = [
+    "RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS", "ICICIBANK.NS",
+    "HINDUNILVR.NS", "SBIN.NS", "BAJFINANCE.NS", "BHARTIARTL.NS", "KOTAKBANK.NS",
+    "LT.NS", "HCLTECH.NS", "ASIANPAINT.NS", "MARUTI.NS", "AXISBANK.NS",
+    "ITC.NS", "ONGC.NS", "WIPRO.NS", "ULTRACEMCO.NS", "TITAN.NS",
+    "SUNPHARMA.NS", "TATASTEEL.NS", "TECHM.NS", "NTPC.NS", "POWERGRID.NS",
+    "BAJAJFINSV.NS", "JSWSTEEL.NS", "NESTLEIND.NS", "HDFCLIFE.NS", "DRREDDY.NS",
+    "CIPLA.NS", "ADANIENT.NS", "GRASIM.NS", "BPCL.NS", "EICHERMOT.NS",
+    "INDUSINDBK.NS", "BRITANNIA.NS", "COALINDIA.NS", "APOLLOHOSP.NS", "DIVISLAB.NS",
+    "BAJAJ-AUTO.NS", "HEROMOTOCO.NS", "ADANIGREEN.NS", "PIDILITIND.NS", "DABUR.NS",
+    "ICICIPRULI.NS", "HINDZINC.NS", "GAIL.NS", "IOC.NS", "SBILIFE.NS",
+    "SIEMENS.NS", "LTI.NS", "PNB.NS", "M&M.NS", "BOSCHLTD.NS",
+    "BANKBARODA.NS", "SRF.NS", "HAVELLS.NS", "BIOCON.NS", "AMBUJACEM.NS",
+    "TATAPOWER.NS", "AUROPHARMA.NS", "TATAMOTORS.NS", "LUPIN.NS", "MPHASIS.NS"
+]
+
+# Function to fetch stock data
 def fetch_stock_data():
-    # Fetch top 300 NSE stocks dynamically
-    nifty500_tickers = [ticker + ".NS" for ticker in pd.read_html("https://en.wikipedia.org/wiki/NIFTY_500")[1]["Symbol"].head(300).tolist()]
-    
-    stock_data = []
-    for ticker in nifty500_tickers:
-        stock = yf.Ticker(ticker)
-        hist = stock.history(period="1y")
+    try:
+        stock_data = []
+        for ticker in nifty500_tickers[:300]:  # Limiting to 300 stocks
+            stock = yf.Ticker(ticker)
+            hist = stock.history(period="1y")
+            
+            stock_info = {
+                "Stock": ticker,
+                "Price": stock.info.get("currentPrice", None),
+                "52W High": stock.info.get("fiftyTwoWeekHigh", None),
+                "52W Low": stock.info.get("fiftyTwoWeekLow", None),
+                "Volume": hist["Volume"].iloc[-1] if not hist.empty else None,
+                "9 Day MA": hist["Close"].rolling(window=9).mean().iloc[-1] if not hist.empty else None,
+                "50 Day MA": hist["Close"].rolling(window=50).mean().iloc[-1] if not hist.empty else None,
+                "Futures Price": None,  # Placeholder for F&O data
+                "Options Price": None,  # Placeholder for F&O data
+                "Sentiment Score": None,  # Placeholder for sentiment analysis
+                "Recommendation": None  # Placeholder for buy/sell logic
+            }
+            stock_data.append(stock_info)
         
-        stock_info = {
-            "Stock": ticker,
-            "Price": stock.info.get("currentPrice", None),
-            "52W High": stock.info.get("fiftyTwoWeekHigh", None),
-            "52W Low": stock.info.get("fiftyTwoWeekLow", None),
-            "Volume": hist["Volume"].iloc[-1] if not hist.empty else None,
-            "9 Day MA": hist["Close"].rolling(window=9).mean().iloc[-1] if not hist.empty else None,
-            "50 Day MA": hist["Close"].rolling(window=50).mean().iloc[-1] if not hist.empty else None,
-            "Futures Price": None,  # Placeholder for F&O data
-            "Options Price": None,  # Placeholder for F&O data
-            "Sentiment Score": None,  # Placeholder for sentiment analysis
-            "Recommendation": None  # Placeholder for buy/sell logic
-        }
-        stock_data.append(stock_info)
-    
-    return pd.DataFrame(stock_data)
+        return pd.DataFrame(stock_data)
+    except Exception as e:
+        st.error(f"Error fetching stock data: {e}")
+        return pd.DataFrame()
 
 # Streamlit UI Setup
 st.title("Stock Sentiment Dashboard")
