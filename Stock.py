@@ -2,21 +2,29 @@ import streamlit as st
 import pandas as pd
 import requests
 import time
+import random
 from bs4 import BeautifulSoup
 
 # Function to fetch top 300 stocks from NSE India
 def fetch_stock_data():
     url = "https://www.nseindia.com/api/equity-stockIndices?index=NIFTY%20500"
+    user_agents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    ]
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "User-Agent": random.choice(user_agents),
         "Accept-Encoding": "gzip, deflate, br",
         "Accept-Language": "en-US,en;q=0.9",
-        "Connection": "keep-alive"
+        "Connection": "keep-alive",
+        "Referer": "https://www.nseindia.com/",
+        "Cache-Control": "no-cache"
     }
     
     session = requests.Session()
     session.get("https://www.nseindia.com", headers=headers)  # Establish session
-    time.sleep(1)  # Avoid bot detection
+    time.sleep(random.uniform(2, 4))  # Random delay to avoid detection
     
     response = session.get(url, headers=headers)
     if response.status_code != 200:
@@ -39,8 +47,8 @@ def fetch_stock_data():
         'totalTradedVolume': 'Volume'
     }, inplace=True)
     
-    df['9 Day MA'] = df['Price']  # Placeholder, needs calculation
-    df['50 Day MA'] = df['Price']  # Placeholder, needs calculation
+    df['9 Day MA'] = df['Price'].rolling(window=9).mean()
+    df['50 Day MA'] = df['Price'].rolling(window=50).mean()
     df['Futures Price'] = None  # Placeholder for F&O data
     df['Options Price'] = None  # Placeholder for F&O data
     df['Sentiment Score'] = None  # Placeholder for sentiment analysis
