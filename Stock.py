@@ -2,17 +2,35 @@ import streamlit as st
 import pandas as pd
 import requests
 
-# Placeholder function to fetch stock data (Replace with actual API calls)
+# Function to fetch top 300 stocks from NSE India
 def fetch_stock_data():
-    data = {
-        'Stock': ['TCS', 'INFY', 'HDFCBANK', 'RELIANCE', 'SBIN'],
-        'Price': [3650, 1500, 1600, 2500, 600],
-        '52W High': [4000, 1700, 1800, 2700, 650],
-        '52W Low': [3200, 1300, 1400, 2200, 500],
-        'Sentiment Score': [0.8, 0.6, -0.2, 0.3, -0.5],
-        'Recommendation': ['BUY', 'BUY', 'HOLD', 'BUY', 'SELL']
+    url = "https://www.nseindia.com/api/equity-stockIndices?index=NIFTY%20500"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
     }
-    return pd.DataFrame(data)
+    
+    session = requests.Session()
+    response = session.get(url, headers=headers)
+    data = response.json()
+    
+    stocks = sorted(data["data"], key=lambda x: x['totalTradedVolume'], reverse=True)[:300]
+    df = pd.DataFrame(stocks)[['symbol', 'lastPrice', 'dayHigh', 'dayLow', 'totalTradedVolume']]
+    df.rename(columns={
+        'symbol': 'Stock',
+        'lastPrice': 'Price',
+        'dayHigh': '52W High',
+        'dayLow': '52W Low',
+        'totalTradedVolume': 'Volume'
+    }, inplace=True)
+    
+    df['9 Day MA'] = df['Price']  # Placeholder, needs calculation
+    df['50 Day MA'] = df['Price']  # Placeholder, needs calculation
+    df['Futures Price'] = None  # Placeholder for F&O data
+    df['Options Price'] = None  # Placeholder for F&O data
+    df['Sentiment Score'] = None  # Placeholder for sentiment analysis
+    df['Recommendation'] = None  # Placeholder for buy/sell logic
+    
+    return df
 
 # Streamlit UI Setup
 st.title("Stock Sentiment Dashboard")
