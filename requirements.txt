@@ -4,3 +4,4 @@ streamlit
 textblob
 nsepy
 smartapi-python
+logzero
