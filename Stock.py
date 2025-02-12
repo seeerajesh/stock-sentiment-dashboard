@@ -4,9 +4,7 @@ import yfinance as yf
 import requests
 from textblob import TextBlob
 import datetime
-
-# Alpha Vantage API Key (Replace with your key)
-ALPHA_VANTAGE_API_KEY = "YOUR_API_KEY"
+from bs4 import BeautifulSoup
 
 # Fetch stock data
 def fetch_stock_data():
@@ -19,13 +17,9 @@ def fetch_stock_data():
             stock = yf.Ticker(ticker + ".NS")
             hist = stock.history(period="1y")
 
-            sentiment_score = fetch_sentiment_score_alpha_vantage(ticker)
-
             ma_9 = hist["Close"].rolling(window=9).mean().iloc[-1] if not hist.empty else None
             ma_50 = hist["Close"].rolling(window=50).mean().iloc[-1] if not hist.empty else None
             ma_trend = "Positive" if ma_9 and ma_50 and ma_9 > ma_50 else "Negative"
-
-            recommendation = "BUY" if sentiment_score > 0.2 else "HOLD" if -0.2 <= sentiment_score <= 0.2 else "SELL"
 
             stock_info = {
                 "Stock": ticker,
@@ -35,9 +29,7 @@ def fetch_stock_data():
                 "Volume": hist["Volume"].iloc[-1] if not hist.empty else None,
                 "9 Day MA": ma_9,
                 "50 Day MA": ma_50,
-                "MA Trend": ma_trend,
-                "Sentiment Score": sentiment_score,
-                "Recommendation": recommendation
+                "MA Trend": ma_trend
             }
             stock_data.append(stock_info)
 
@@ -46,40 +38,22 @@ def fetch_stock_data():
         st.error(f"Error fetching stock data: {e}")
         return pd.DataFrame()
 
-# Fetch sentiment score via Alpha Vantage
-def fetch_sentiment_score_alpha_vantage(ticker):
+# Fetch stock-related news from Moneycontrol
+def fetch_stock_news_moneycontrol(ticker):
     try:
-        url = f"https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers={ticker}&apikey={ALPHA_VANTAGE_API_KEY}"
-        response = requests.get(url)
-        data = response.json()
-        
-        sentiment_total = 0
-        count = 0
-        
-        if "feed" in data:
-            for article in data["feed"][:5]:
-                sentiment_score = article.get("overall_sentiment_score", 0)
-                sentiment_total += sentiment_score
-                count += 1
-        
-        return sentiment_total / count if count > 0 else 0
-    except Exception:
-        return 0
-
-# Fetch stock-related news from Alpha Vantage
-def fetch_stock_news_alpha_vantage(ticker):
-    try:
-        url = f"https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers={ticker}&apikey={ALPHA_VANTAGE_API_KEY}"
-        response = requests.get(url)
-        data = response.json()
+        url = f"https://www.moneycontrol.com/news/tags/{ticker}.html"
+        response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+        soup = BeautifulSoup(response.text, 'html.parser')
 
         articles = []
-        if "feed" in data:
-            for article in data["feed"][:5]:
-                title = article.get("title", "No Title")
-                url = article.get("url", "#")
-                articles.append({"Stock": ticker, "Title": title, "URL": url})
-        
+        for news in soup.find_all('li', class_='clearfix')[:5]:
+            title_tag = news.find('h2')
+            link_tag = news.find('a')
+            if title_tag and link_tag:
+                title = title_tag.text.strip()
+                link = link_tag['href']
+                articles.append({"Stock": ticker, "Title": title, "URL": link})
+
         return pd.DataFrame(articles)
     except Exception as e:
         st.error(f"Error fetching news data for {ticker}: {e}")
@@ -90,8 +64,9 @@ def fetch_options_data(ticker):
     try:
         stock = yf.Ticker(ticker + ".NS")
         expiry_dates = stock.options
+        st.write(f"Expiry dates for {ticker}: {expiry_dates}")  # Debugging
         options_data = []
-        
+
         if expiry_dates:
             for expiry in expiry_dates[:1]:  # Limiting to the nearest expiry
                 options = stock.option_chain(expiry)
@@ -100,7 +75,7 @@ def fetch_options_data(ticker):
                     df["Stock"] = ticker
                     df["Expiry"] = expiry
                     options_data.append(df)
-        
+
         return pd.concat(options_data) if options_data else pd.DataFrame()
     except Exception as e:
         st.error(f"Error fetching options data for {ticker}: {e}")
@@ -112,7 +87,7 @@ st.title("Stock Sentiment Dashboard")
 df = fetch_stock_data()
 
 if not df.empty:
-    df_sorted = df.sort_values(by='Sentiment Score', ascending=False).head(20)
+    df_sorted = df.sort_values(by='Stock', ascending=True).head(20)
     st.dataframe(df_sorted)
 
     st.sidebar.header("Filters")
@@ -125,7 +100,7 @@ if not df.empty:
 
     # Fetch and display news data
     st.write("### Stock News")
-    news_df = pd.concat([fetch_stock_news_alpha_vantage(ticker) for ticker in df['Stock'].unique()])
+    news_df = pd.concat([fetch_stock_news_moneycontrol(ticker) for ticker in df['Stock'].unique()])
     if not news_df.empty:
         st.dataframe(news_df)
     else:
