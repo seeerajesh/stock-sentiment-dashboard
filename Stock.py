@@ -4,17 +4,11 @@ import yfinance as yf
 import requests
 from textblob import TextBlob
 import datetime
-from bs4 import BeautifulSoup
-import urllib.parse
 
-# Angel Broking API Credentials (Not used for now)
-API_KEY = "mN0Yc5MP"
-SECRET_KEY = "f84c35fb-f7ba-47e0-9939-89e9100a97c1"
-CLIENT_ID = "R12345"
-NEWS_API_KEY = "953be01115d64859b8f1fe76e69d9a3c"
+# Alpha Vantage API Key (Replace with your key)
+ALPHA_VANTAGE_API_KEY = "YOUR_API_KEY"
 
 # Fetch stock data
-
 def fetch_stock_data():
     try:
         stock_data = []
@@ -25,7 +19,7 @@ def fetch_stock_data():
             stock = yf.Ticker(ticker + ".NS")
             hist = stock.history(period="1y")
 
-            sentiment_score = fetch_sentiment_score(ticker)
+            sentiment_score = fetch_sentiment_score_alpha_vantage(ticker)
 
             ma_9 = hist["Close"].rolling(window=9).mean().iloc[-1] if not hist.empty else None
             ma_50 = hist["Close"].rolling(window=50).mean().iloc[-1] if not hist.empty else None
@@ -42,10 +36,6 @@ def fetch_stock_data():
                 "9 Day MA": ma_9,
                 "50 Day MA": ma_50,
                 "MA Trend": ma_trend,
-                "Futures Price": None,
-                "Call Option Price": None,
-                "Put Option Price": None,
-                "Options Trend": "Neutral",
                 "Sentiment Score": sentiment_score,
                 "Recommendation": recommendation
             }
@@ -56,46 +46,64 @@ def fetch_stock_data():
         st.error(f"Error fetching stock data: {e}")
         return pd.DataFrame()
 
-# Fetch sentiment score
-def fetch_sentiment_score(ticker):
+# Fetch sentiment score via Alpha Vantage
+def fetch_sentiment_score_alpha_vantage(ticker):
     try:
-        keywords = [
-            ticker, f"{ticker} stock", f"{ticker} share price", f"{ticker} earnings", 
-            f"{ticker} forecast", f"{ticker} outlook", "market trends", "GDP growth",
-            "industry performance", "broker recommendations"
-        ]
-        query = " OR ".join(keywords)
-        url = f"https://newsapi.org/v2/everything?q={query}&apiKey={NEWS_API_KEY}"
+        url = f"https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers={ticker}&apikey={ALPHA_VANTAGE_API_KEY}"
         response = requests.get(url)
-        articles = response.json().get("articles", [])
-
+        data = response.json()
+        
         sentiment_total = 0
-        for article in articles[:10]:  # Limit to first 10 articles
-            sentiment = TextBlob(article["title"] + " " + article.get("description", "")).sentiment.polarity
-            sentiment_total += sentiment
-
-        return sentiment_total / len(articles) if articles else 0
+        count = 0
+        
+        if "feed" in data:
+            for article in data["feed"][:5]:
+                sentiment_score = article.get("overall_sentiment_score", 0)
+                sentiment_total += sentiment_score
+                count += 1
+        
+        return sentiment_total / count if count > 0 else 0
     except Exception:
         return 0
 
-# Fetch stock-related news from open sources
-def fetch_stock_news_web_scraping(ticker):
+# Fetch stock-related news from Alpha Vantage
+def fetch_stock_news_alpha_vantage(ticker):
     try:
-        search_query = urllib.parse.quote(f"{ticker} stock news")
-        url = f"https://www.google.com/search?q={search_query}&tbm=nws"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers)
-        soup = BeautifulSoup(response.text, "html.parser")
-        
+        url = f"https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers={ticker}&apikey={ALPHA_VANTAGE_API_KEY}"
+        response = requests.get(url)
+        data = response.json()
+
         articles = []
-        for result in soup.find_all("div", class_="BVG0Nb")[:5]:
-            title = result.get_text()
-            link = result.find_parent("a")["href"]
-            articles.append({"Stock": ticker, "Title": title, "URL": link})
+        if "feed" in data:
+            for article in data["feed"][:5]:
+                title = article.get("title", "No Title")
+                url = article.get("url", "#")
+                articles.append({"Stock": ticker, "Title": title, "URL": url})
         
         return pd.DataFrame(articles)
     except Exception as e:
-        st.error(f"Error fetching news data from web for {ticker}: {e}")
+        st.error(f"Error fetching news data for {ticker}: {e}")
+        return pd.DataFrame()
+
+# Fetch options data
+def fetch_options_data(ticker):
+    try:
+        stock = yf.Ticker(ticker + ".NS")
+        expiry_dates = stock.options
+        options_data = []
+        
+        if expiry_dates:
+            for expiry in expiry_dates[:1]:  # Limiting to the nearest expiry
+                options = stock.option_chain(expiry)
+                for option_type, df in zip(["Calls", "Puts"], [options.calls, options.puts]):
+                    df["Type"] = option_type
+                    df["Stock"] = ticker
+                    df["Expiry"] = expiry
+                    options_data.append(df)
+        
+        return pd.concat(options_data) if options_data else pd.DataFrame()
+    except Exception as e:
+        st.error(f"Error fetching options data for {ticker}: {e}")
         return pd.DataFrame()
 
 # Streamlit UI Setup
@@ -117,10 +125,18 @@ if not df.empty:
 
     # Fetch and display news data
     st.write("### Stock News")
-    news_df = pd.concat([fetch_stock_news_web_scraping(ticker) for ticker in df['Stock'].unique()])
+    news_df = pd.concat([fetch_stock_news_alpha_vantage(ticker) for ticker in df['Stock'].unique()])
     if not news_df.empty:
         st.dataframe(news_df)
     else:
         st.warning("No news available for selected stocks.")
+    
+    # Fetch and display options data
+    st.write("### Options Data")
+    options_df = pd.concat([fetch_options_data(ticker) for ticker in df['Stock'].unique()])
+    if not options_df.empty:
+        st.dataframe(options_df)
+    else:
+        st.warning("No options data available.")
 else:
     st.warning("No stock data available.")
