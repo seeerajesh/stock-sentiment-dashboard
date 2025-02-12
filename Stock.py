@@ -78,8 +78,8 @@ def fetch_options_data_nse(symbol="RELIANCE"):
             st.error(f"Error fetching options data: HTTP {response.status_code}")
             return pd.DataFrame()
         
-        data = response.json()
-        st.write("NSE API Response Debug:", data)  # Debugging output
+    #    data = response.json()
+    #    st.write("NSE API Response Debug:", data)  # Debugging output
         
         options_data = []
         if "records" in data and "data" in data["records"]:
