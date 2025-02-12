@@ -3,62 +3,52 @@ import pandas as pd
 import yfinance as yf
 import requests
 from textblob import TextBlob
-from nsepy.derivatives import get_expiry_date
-from nsepy import get_history
+from smartapi import SmartConnect  # Angel Broking API
 import datetime
 
-# List of top 300 NSE stocks (replace with actual tickers)
-nifty500_tickers = [
-    "RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK",
-    "HINDUNILVR", "SBIN", "BAJFINANCE", "BHARTIARTL", "KOTAKBANK",
-    "LT", "HCLTECH", "ASIANPAINT", "MARUTI", "AXISBANK",
-    "ITC", "ONGC", "WIPRO", "ULTRACEMCO", "TITAN"
-]  # Extend to 300 stocks
+# Angel Broking API Credentials
+API_KEY = "mN0Yc5MP"
+SECRET_KEY = "ea2177a7-d947-4f68-a844-e9b9e1da365c"
+CLIENT_ID = "R12345"
 
 NEWS_API_KEY = "953be01115d64859b8f1fe76e69d9a3c"
 
+def get_smartapi_session():
+    obj = SmartConnect(api_key=API_KEY)
+    data = obj.generateSession(CLIENT_ID, SECRET_KEY)
+    return obj
+
 def fetch_stock_data():
     try:
+        obj = get_smartapi_session()
         stock_data = []
         today = datetime.date.today()
-        expiry_dates = get_expiry_date(year=today.year, month=today.month)
-        expiry_date = expiry_dates[-1] if expiry_dates else None
 
         for ticker in nifty500_tickers[:300]:  # Limiting to 300 stocks
             stock = yf.Ticker(ticker + ".NS")
             hist = stock.history(period="1y")
 
-            future_data = pd.DataFrame()
-            option_data = pd.DataFrame()
-            put_data = pd.DataFrame()
-            
-            if expiry_date:
-                try:
-                    future_data = get_history(symbol=ticker, start=today - datetime.timedelta(days=30),
-                                              end=today, index=False, futures=True, expiry_date=expiry_date)
-                    option_data = get_history(symbol=ticker, start=today - datetime.timedelta(days=30),
-                                              end=today, index=False, option_type="CE", expiry_date=expiry_date)
-                    put_data = get_history(symbol=ticker, start=today - datetime.timedelta(days=30),
-                                           end=today, index=False, option_type="PE", expiry_date=expiry_date)
-                except Exception as e:
-                    st.warning(f"Error fetching derivatives data for {ticker}: {e}")
-            
-            latest_call = option_data.iloc[-1]["Close"] if not option_data.empty else None
-            latest_put = put_data.iloc[-1]["Close"] if not put_data.empty else None
-            
+            # Fetch Futures and Options Data
+            future_price, call_price, put_price = None, None, None
+            opt_trend = "Neutral"
+
+            try:
+                future_data = obj.ltpData("NSE", ticker, "FUT")
+                call_data = obj.ltpData("NSE", ticker, "OPT")
+                put_data = obj.ltpData("NSE", ticker, "PE")
+                
+                future_price = future_data['data']['ltp'] if 'data' in future_data else None
+                call_price = call_data['data']['ltp'] if 'data' in call_data else None
+                put_price = put_data['data']['ltp'] if 'data' in put_data else None
+            except Exception as e:
+                st.warning(f"Error fetching options data for {ticker}: {e}")
+
             sentiment_score = fetch_sentiment_score(ticker)
 
             ma_9 = hist["Close"].rolling(window=9).mean().iloc[-1] if not hist.empty else None
             ma_50 = hist["Close"].rolling(window=50).mean().iloc[-1] if not hist.empty else None
             ma_trend = "Positive" if ma_9 and ma_50 and ma_9 > ma_50 else "Negative"
-            
-            opt_trend = "Neutral"
-            if latest_call and latest_put and len(option_data) > 1 and len(put_data) > 1:
-                if latest_call > option_data.iloc[-2]["Close"]:
-                    opt_trend = "Positive"
-                if latest_put > put_data.iloc[-2]["Close"]:
-                    opt_trend = "Negative"
-            
+
             recommendation = "BUY" if sentiment_score > 0.2 else "HOLD" if -0.2 <= sentiment_score <= 0.2 else "SELL"
 
             stock_info = {
@@ -70,9 +60,9 @@ def fetch_stock_data():
                 "9 Day MA": ma_9,
                 "50 Day MA": ma_50,
                 "MA Trend": ma_trend,
-                "Futures Price": future_data.iloc[-1]["Close"] if not future_data.empty else None,
-                "Call Option Price": latest_call,
-                "Put Option Price": latest_put,
+                "Futures Price": future_price,
+                "Call Option Price": call_price,
+                "Put Option Price": put_price,
                 "Options Trend": opt_trend,
                 "Sentiment Score": sentiment_score,
                 "Recommendation": recommendation
