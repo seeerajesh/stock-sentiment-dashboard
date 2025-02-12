@@ -33,12 +33,15 @@ def fetch_stock_data():
             put_data = pd.DataFrame()
             
             if expiry_date:
-                future_data = get_history(symbol=ticker, start=today - datetime.timedelta(days=30),
-                                          end=today, index=False, futures=True, expiry_date=expiry_date)
-                option_data = get_history(symbol=ticker, start=today - datetime.timedelta(days=30),
-                                          end=today, index=False, option_type="CE", expiry_date=expiry_date)
-                put_data = get_history(symbol=ticker, start=today - datetime.timedelta(days=30),
-                                       end=today, index=False, option_type="PE", expiry_date=expiry_date)
+                try:
+                    future_data = get_history(symbol=ticker, start=today - datetime.timedelta(days=30),
+                                              end=today, index=False, futures=True, expiry_date=expiry_date)
+                    option_data = get_history(symbol=ticker, start=today - datetime.timedelta(days=30),
+                                              end=today, index=False, option_type="CE", expiry_date=expiry_date)
+                    put_data = get_history(symbol=ticker, start=today - datetime.timedelta(days=30),
+                                           end=today, index=False, option_type="PE", expiry_date=expiry_date)
+                except Exception as e:
+                    st.warning(f"Error fetching derivatives data for {ticker}: {e}")
             
             latest_call = option_data.iloc[-1]["Close"] if not option_data.empty else None
             latest_put = put_data.iloc[-1]["Close"] if not put_data.empty else None
@@ -50,7 +53,7 @@ def fetch_stock_data():
             ma_trend = "Positive" if ma_9 and ma_50 and ma_9 > ma_50 else "Negative"
             
             opt_trend = "Neutral"
-            if latest_call and latest_put:
+            if latest_call and latest_put and len(option_data) > 1 and len(put_data) > 1:
                 if latest_call > option_data.iloc[-2]["Close"]:
                     opt_trend = "Positive"
                 if latest_put > put_data.iloc[-2]["Close"]:
