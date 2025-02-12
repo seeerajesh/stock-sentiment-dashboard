@@ -79,18 +79,20 @@ def fetch_options_data_nse(symbol="RELIANCE"):
             return pd.DataFrame()
         
         data = response.json()
+        st.write("NSE API Response Debug:", data)  # Debugging output
+        
         options_data = []
         if "records" in data and "data" in data["records"]:
             for option in data["records"]["data"]:
                 options_data.append({
                     "Stock": symbol,
-                    "Strike Price": option["strikePrice"],
-                    "Expiry Date": option["expiryDate"],
-                    "Option Type": option["optionType"],
-                    "Last Price": option["lastPrice"],
-                    "Change": option["change"],
-                    "% Change": option["pChange"],
-                    "Volume": option["volume"]
+                    "Strike Price": option.get("strikePrice", "N/A"),
+                    "Expiry Date": option.get("expiryDate", "N/A"),
+                    "Option Type": option.get("optionType", "N/A"),
+                    "Last Price": option.get("lastPrice", "N/A"),
+                    "Change": option.get("change", "N/A"),
+                    "% Change": option.get("pChange", "N/A"),
+                    "Volume": option.get("volume", "N/A")
                 })
         
         return pd.DataFrame(options_data) if options_data else pd.DataFrame()
