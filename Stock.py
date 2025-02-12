@@ -5,6 +5,7 @@ import requests
 from textblob import TextBlob
 from SmartApi import SmartConnect  # Angel Broking API
 import datetime
+import pyotp  # Import pyotp for TOTP generation
 
 # Angel Broking API Credentials
 API_KEY = "mN0Yc5MP"
@@ -12,10 +13,16 @@ SECRET_KEY = "ea2177a7-d947-4f68-a844-e9b9e1da365c"
 CLIENT_ID = "R12345"
 NEWS_API_KEY = "953be01115d64859b8f1fe76e69d9a3c"
 
+# Generate TOTP
+TOTP_SECRET = SECRET_KEY  # Use the secret key for TOTP generation
+def generate_totp():
+    return pyotp.TOTP(TOTP_SECRET).now()
+
 # Initialize SmartAPI session
 def get_smartapi_session():
     obj = SmartConnect(api_key=API_KEY)
-    data = obj.generateSession(CLIENT_ID, SECRET_KEY)
+    totp = generate_totp()
+    data = obj.generateSession(CLIENT_ID, SECRET_KEY, totp)
     return obj
 
 # Fetch stock data
