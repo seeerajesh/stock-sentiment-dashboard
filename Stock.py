@@ -22,44 +22,40 @@ def fetch_stock_data():
         stock_data = []
         today = datetime.date.today()
         expiry_dates = get_expiry_date(year=today.year, month=today.month)
-        if len(expiry_dates) > 1:
-            expiry_date = expiry_dates[1]  # Taking the second nearest expiry
-        else:
-            expiry_date = expiry_dates[0]
+        expiry_date = expiry_dates[-1] if expiry_dates else None
 
         for ticker in nifty500_tickers[:300]:  # Limiting to 300 stocks
             stock = yf.Ticker(ticker + ".NS")
             hist = stock.history(period="1y")
 
-            # Fetch futures and options data using nsepy
-            future_data = get_history(symbol=ticker, start=today - datetime.timedelta(days=30),
-                                      end=today, index=False, futures=True, expiry_date=expiry_date)
-            option_data = get_history(symbol=ticker, start=today - datetime.timedelta(days=30),
-                                      end=today, index=False, option_type="CE", expiry_date=expiry_date)
-            put_data = get_history(symbol=ticker, start=today - datetime.timedelta(days=30),
-                                   end=today, index=False, option_type="PE", expiry_date=expiry_date)
-
-            # Get latest call and put prices
+            future_data = pd.DataFrame()
+            option_data = pd.DataFrame()
+            put_data = pd.DataFrame()
+            
+            if expiry_date:
+                future_data = get_history(symbol=ticker, start=today - datetime.timedelta(days=30),
+                                          end=today, index=False, futures=True, expiry_date=expiry_date)
+                option_data = get_history(symbol=ticker, start=today - datetime.timedelta(days=30),
+                                          end=today, index=False, option_type="CE", expiry_date=expiry_date)
+                put_data = get_history(symbol=ticker, start=today - datetime.timedelta(days=30),
+                                       end=today, index=False, option_type="PE", expiry_date=expiry_date)
+            
             latest_call = option_data.iloc[-1]["Close"] if not option_data.empty else None
             latest_put = put_data.iloc[-1]["Close"] if not put_data.empty else None
-
-            # Fetch sentiment score
+            
             sentiment_score = fetch_sentiment_score(ticker)
 
-            # Moving Average Trend
             ma_9 = hist["Close"].rolling(window=9).mean().iloc[-1] if not hist.empty else None
             ma_50 = hist["Close"].rolling(window=50).mean().iloc[-1] if not hist.empty else None
             ma_trend = "Positive" if ma_9 and ma_50 and ma_9 > ma_50 else "Negative"
-
-            # Options Sentiment
+            
             opt_trend = "Neutral"
             if latest_call and latest_put:
                 if latest_call > option_data.iloc[-2]["Close"]:
                     opt_trend = "Positive"
                 if latest_put > put_data.iloc[-2]["Close"]:
                     opt_trend = "Negative"
-
-            # Define recommendation
+            
             recommendation = "BUY" if sentiment_score > 0.2 else "HOLD" if -0.2 <= sentiment_score <= 0.2 else "SELL"
 
             stock_info = {
@@ -103,17 +99,12 @@ def fetch_sentiment_score(ticker):
 # Streamlit UI Setup
 st.title("Stock Sentiment Dashboard")
 
-# Fetch data
 df = fetch_stock_data()
 
 if not df.empty:
-    # Filter: Top 20 by Sentiment Score
     df_sorted = df.sort_values(by='Sentiment Score', ascending=False).head(20)
-
-    # Display Dataframe
     st.dataframe(df_sorted)
 
-    # Additional Filters
     st.sidebar.header("Filters")
     selected_stock = st.sidebar.selectbox("Select Stock", ['All'] + list(df['Stock'].unique()))
     if selected_stock != 'All':
