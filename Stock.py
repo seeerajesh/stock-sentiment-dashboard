@@ -76,6 +76,28 @@ def fetch_sentiment_score(ticker):
     except Exception:
         return 0
 
+# Fetch stock-related news
+def fetch_stock_news(ticker):
+    try:
+        url = f"https://newsapi.org/v2/everything?q={ticker}&apiKey={NEWS_API_KEY}"
+        response = requests.get(url)
+        articles = response.json().get("articles", [])
+        news_data = []
+
+        for article in articles[:5]:  # Limit to first 5 news articles
+            news_data.append({
+                "Stock": ticker,
+                "Title": article["title"],
+                "Description": article.get("description", ""),
+                "Source": article["source"]["name"],
+                "Published At": article["publishedAt"]
+            })
+
+        return pd.DataFrame(news_data)
+    except Exception as e:
+        st.error(f"Error fetching news data for {ticker}: {e}")
+        return pd.DataFrame()
+
 # Streamlit UI Setup
 st.title("Stock Sentiment Dashboard")
 
@@ -92,5 +114,13 @@ if not df.empty:
 
     st.write("### Filtered Stocks")
     st.dataframe(df_sorted)
+
+    # Fetch and display news data
+    st.write("### Stock News")
+    news_df = pd.concat([fetch_stock_news(ticker) for ticker in df['Stock'].unique()])
+    if not news_df.empty:
+        st.dataframe(news_df)
+    else:
+        st.warning("No news available for selected stocks.")
 else:
     st.warning("No stock data available.")
