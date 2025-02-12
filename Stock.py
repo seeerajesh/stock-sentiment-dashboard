@@ -57,13 +57,19 @@ def fetch_stock_data():
 # Fetch sentiment score
 def fetch_sentiment_score(ticker):
     try:
-        url = f"https://newsapi.org/v2/everything?q={ticker}&apiKey={NEWS_API_KEY}"
+        keywords = [
+            ticker, f"{ticker} stock", f"{ticker} share price", f"{ticker} earnings", 
+            f"{ticker} forecast", f"{ticker} outlook", "market trends", "GDP growth",
+            "industry performance", "broker recommendations"
+        ]
+        query = " OR ".join(keywords)
+        url = f"https://newsapi.org/v2/everything?q={query}&apiKey={NEWS_API_KEY}"
         response = requests.get(url)
         articles = response.json().get("articles", [])
 
         sentiment_total = 0
         for article in articles[:10]:  # Limit to first 10 articles
-            sentiment = TextBlob(article["title"]).sentiment.polarity
+            sentiment = TextBlob(article["title"] + " " + article.get("description", "")).sentiment.polarity
             sentiment_total += sentiment
 
         return sentiment_total / len(articles) if articles else 0
