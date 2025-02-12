@@ -84,16 +84,24 @@ def fetch_options_data_nse(symbol="RELIANCE"):
         options_data = []
         if "records" in data and "data" in data["records"]:
             for option in data["records"]["data"]:
-                options_data.append({
-                    "Stock": symbol,
-                    "Strike Price": option.get("strikePrice", "N/A"),
-                    "Expiry Date": option.get("expiryDate", "N/A"),
-                    "Option Type": option.get("optionType", "N/A"),
-                    "Last Price": option.get("lastPrice", "N/A"),
-                    "Change": option.get("change", "N/A"),
-                    "% Change": option.get("pChange", "N/A"),
-                    "Volume": option.get("volume", "N/A")
-                })
+                ce_data = option.get("CE", {})
+                pe_data = option.get("PE", {})
+                
+                if ce_data:
+                    options_data.append({
+                        "Stock": symbol,
+                        "Option Type": "CE",
+                        "Expiry Date": ce_data.get("expiryDate", "N/A"),
+                        "Strike Price": ce_data.get("strikePrice", "N/A")
+                    })
+                
+                if pe_data:
+                    options_data.append({
+                        "Stock": symbol,
+                        "Option Type": "PE",
+                        "Expiry Date": pe_data.get("expiryDate", "N/A"),
+                        "Strike Price": pe_data.get("strikePrice", "N/A")
+                    })
         
         return pd.DataFrame(options_data) if options_data else pd.DataFrame()
     except Exception as e:
