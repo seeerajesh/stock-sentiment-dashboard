@@ -5,3 +5,4 @@ textblob
 nsepy
 smartapi-python
 logzero
+websocket-client
