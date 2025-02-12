@@ -3,26 +3,28 @@ import pandas as pd
 import yfinance as yf
 import requests
 from textblob import TextBlob
-from smartapi import SmartConnect  # Angel Broking API
+from SmartApi import SmartConnect  # Angel Broking API
 import datetime
 
 # Angel Broking API Credentials
 API_KEY = "mN0Yc5MP"
 SECRET_KEY = "ea2177a7-d947-4f68-a844-e9b9e1da365c"
 CLIENT_ID = "R12345"
-
 NEWS_API_KEY = "953be01115d64859b8f1fe76e69d9a3c"
 
+# Initialize SmartAPI session
 def get_smartapi_session():
     obj = SmartConnect(api_key=API_KEY)
     data = obj.generateSession(CLIENT_ID, SECRET_KEY)
     return obj
 
+# Fetch stock data
 def fetch_stock_data():
     try:
         obj = get_smartapi_session()
         stock_data = []
         today = datetime.date.today()
+        nifty500_tickers = ["RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK"]  # Replace with actual top 300 stocks
 
         for ticker in nifty500_tickers[:300]:  # Limiting to 300 stocks
             stock = yf.Ticker(ticker + ".NS")
@@ -31,11 +33,11 @@ def fetch_stock_data():
             # Fetch Futures and Options Data
             future_price, call_price, put_price = None, None, None
             opt_trend = "Neutral"
-
+            
             try:
-                future_data = obj.ltpData("NSE", ticker, "FUT")
-                call_data = obj.ltpData("NSE", ticker, "OPT")
-                put_data = obj.ltpData("NSE", ticker, "PE")
+                future_data = obj.ltpData(exchange="NSE", tradingsymbol=ticker, symboltoken="", instrumenttype="FUTSTK")
+                call_data = obj.ltpData(exchange="NSE", tradingsymbol=ticker, symboltoken="", instrumenttype="OPTSTK", strikeprice="", optiontype="CE", expirydate="")
+                put_data = obj.ltpData(exchange="NSE", tradingsymbol=ticker, symboltoken="", instrumenttype="OPTSTK", strikeprice="", optiontype="PE", expirydate="")
                 
                 future_price = future_data['data']['ltp'] if 'data' in future_data else None
                 call_price = call_data['data']['ltp'] if 'data' in call_data else None
@@ -74,6 +76,7 @@ def fetch_stock_data():
         st.error(f"Error fetching stock data: {e}")
         return pd.DataFrame()
 
+# Fetch sentiment score
 def fetch_sentiment_score(ticker):
     try:
         url = f"https://newsapi.org/v2/everything?q={ticker}&apiKey={NEWS_API_KEY}"
