@@ -79,7 +79,6 @@ def fetch_options_data_nse(symbol="RELIANCE"):
             return pd.DataFrame()
         
        data = response.json()
-    #    st.write("NSE API Response Debug:", data)  # Debugging output
         
         options_data = []
         if "records" in data and "data" in data["records"]:
