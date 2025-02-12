@@ -60,27 +60,38 @@ def fetch_stock_news_moneycontrol(ticker):
         return pd.DataFrame()
 
 # Fetch options data from NSE API
-def fetch_options_data_nse():
+def fetch_options_data_nse(symbol="RELIANCE"):
     try:
-        url = "https://www.nseindia.com/api/marketstatus"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers)
+        url = "https://www1.nseindia.com/live_market/dynaContent/live_watch/get_quote/ajaxFOGetQuoteJSON.jsp"
+        params = {"underlying": symbol, "instrument": "OPTSTK", "type": "SELECT", "strike": "SELECT", "expiry": "SELECT"}
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "X-Requested-With": "XMLHttpRequest",
+            "Host": "www1.nseindia.com",
+            "Referer": f"https://www1.nseindia.com/live_market/dynaContent/live_watch/get_quote/GetQuoteFO.jsp?underlying={symbol}&instrument=OPTSTK&type=SELECT&strike=SELECT&expiry=SELECT"
+        }
+        session = requests.Session()
+        session.get("https://www1.nseindia.com", headers=headers)  # Establish session
+        response = session.get(url, headers=headers, params=params)
+        
+        if response.status_code != 200:
+            st.error(f"Error fetching options data: HTTP {response.status_code}")
+            return pd.DataFrame()
+        
         data = response.json()
-
         options_data = []
-        if "giftnifty" in data:
-            for contract in data["giftnifty"]:
-                if contract["SYMBOL"] == "RELIANCE":
-                    options_data.append({
-                        "Stock": "RELIANCE",
-                        "Type": contract["INSTRUMENTTYPE"],
-                        "Strike Price": contract["STRIKEPRICE"],
-                        "Expiry Date": contract["EXPIRYDATE"],
-                        "Last Price": contract["LASTPRICE"],
-                        "Day Change": contract["DAYCHANGE"],
-                        "% Change": contract["PERCHANGE"],
-                        "Contracts Traded": contract["CONTRACTSTRADED"]
-                    })
+        if "records" in data and "data" in data["records"]:
+            for option in data["records"]["data"]:
+                options_data.append({
+                    "Stock": symbol,
+                    "Strike Price": option["strikePrice"],
+                    "Expiry Date": option["expiryDate"],
+                    "Option Type": option["optionType"],
+                    "Last Price": option["lastPrice"],
+                    "Change": option["change"],
+                    "% Change": option["pChange"],
+                    "Volume": option["volume"]
+                })
         
         return pd.DataFrame(options_data) if options_data else pd.DataFrame()
     except Exception as e:
