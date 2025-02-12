@@ -9,7 +9,7 @@ import pyotp  # Import pyotp for TOTP generation
 
 # Angel Broking API Credentials
 API_KEY = "mN0Yc5MP"
-SECRET_KEY = "ea2177a7-d947-4f68-a844-e9b9e1da365c"
+SECRET_KEY = "f84c35fb-f7ba-47e0-9939-89e9100a97c1"
 CLIENT_ID = "R12345"
 NEWS_API_KEY = "953be01115d64859b8f1fe76e69d9a3c"
 
