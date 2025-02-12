@@ -4,6 +4,8 @@ import yfinance as yf
 import requests
 from textblob import TextBlob
 import datetime
+from bs4 import BeautifulSoup
+import urllib.parse
 
 # Angel Broking API Credentials (Not used for now)
 API_KEY = "mN0Yc5MP"
@@ -76,26 +78,24 @@ def fetch_sentiment_score(ticker):
     except Exception:
         return 0
 
-# Fetch stock-related news
-def fetch_stock_news(ticker):
+# Fetch stock-related news from open sources
+def fetch_stock_news_web_scraping(ticker):
     try:
-        url = f"https://newsapi.org/v2/everything?q={ticker}&apiKey={NEWS_API_KEY}"
-        response = requests.get(url)
-        articles = response.json().get("articles", [])
-        news_data = []
-
-        for article in articles[:5]:  # Limit to first 5 news articles
-            news_data.append({
-                "Stock": ticker,
-                "Title": article["title"],
-                "Description": article.get("description", ""),
-                "Source": article["source"]["name"],
-                "Published At": article["publishedAt"]
-            })
-
-        return pd.DataFrame(news_data)
+        search_query = urllib.parse.quote(f"{ticker} stock news")
+        url = f"https://www.google.com/search?q={search_query}&tbm=nws"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers)
+        soup = BeautifulSoup(response.text, "html.parser")
+        
+        articles = []
+        for result in soup.find_all("div", class_="BVG0Nb")[:5]:
+            title = result.get_text()
+            link = result.find_parent("a")["href"]
+            articles.append({"Stock": ticker, "Title": title, "URL": link})
+        
+        return pd.DataFrame(articles)
     except Exception as e:
-        st.error(f"Error fetching news data for {ticker}: {e}")
+        st.error(f"Error fetching news data from web for {ticker}: {e}")
         return pd.DataFrame()
 
 # Streamlit UI Setup
@@ -117,7 +117,7 @@ if not df.empty:
 
     # Fetch and display news data
     st.write("### Stock News")
-    news_df = pd.concat([fetch_stock_news(ticker) for ticker in df['Stock'].unique()])
+    news_df = pd.concat([fetch_stock_news_web_scraping(ticker) for ticker in df['Stock'].unique()])
     if not news_df.empty:
         st.dataframe(news_df)
     else:
