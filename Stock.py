@@ -59,26 +59,32 @@ def fetch_stock_news_moneycontrol(ticker):
         st.error(f"Error fetching news data for {ticker}: {e}")
         return pd.DataFrame()
 
-# Fetch options data
-def fetch_options_data(ticker):
+# Fetch options data from NSE API
+def fetch_options_data_nse():
     try:
-        stock = yf.Ticker(ticker + ".NS")
-        expiry_dates = stock.options
-        st.write(f"Expiry dates for {ticker}: {expiry_dates}")  # Debugging
+        url = "https://www.nseindia.com/api/marketstatus"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers)
+        data = response.json()
+
         options_data = []
-
-        if expiry_dates:
-            for expiry in expiry_dates[:1]:  # Limiting to the nearest expiry
-                options = stock.option_chain(expiry)
-                for option_type, df in zip(["Calls", "Puts"], [options.calls, options.puts]):
-                    df["Type"] = option_type
-                    df["Stock"] = ticker
-                    df["Expiry"] = expiry
-                    options_data.append(df)
-
-        return pd.concat(options_data) if options_data else pd.DataFrame()
+        if "giftnifty" in data:
+            for contract in data["giftnifty"]:
+                if contract["SYMBOL"] == "RELIANCE":
+                    options_data.append({
+                        "Stock": "RELIANCE",
+                        "Type": contract["INSTRUMENTTYPE"],
+                        "Strike Price": contract["STRIKEPRICE"],
+                        "Expiry Date": contract["EXPIRYDATE"],
+                        "Last Price": contract["LASTPRICE"],
+                        "Day Change": contract["DAYCHANGE"],
+                        "% Change": contract["PERCHANGE"],
+                        "Contracts Traded": contract["CONTRACTSTRADED"]
+                    })
+        
+        return pd.DataFrame(options_data) if options_data else pd.DataFrame()
     except Exception as e:
-        st.error(f"Error fetching options data for {ticker}: {e}")
+        st.error(f"Error fetching options data from NSE: {e}")
         return pd.DataFrame()
 
 # Streamlit UI Setup
@@ -106,9 +112,9 @@ if not df.empty:
     else:
         st.warning("No news available for selected stocks.")
     
-    # Fetch and display options data
-    st.write("### Options Data")
-    options_df = pd.concat([fetch_options_data(ticker) for ticker in df['Stock'].unique()])
+    # Fetch and display options data from NSE
+    st.write("### Options Data (NSE API)")
+    options_df = fetch_options_data_nse()
     if not options_df.empty:
         st.dataframe(options_df)
     else:
