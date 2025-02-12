@@ -78,7 +78,7 @@ def fetch_options_data_nse(symbol="RELIANCE"):
             st.error(f"Error fetching options data: HTTP {response.status_code}")
             return pd.DataFrame()
         
-       data = response.json()
+        data = response.json()
         
         options_data = []
         if "records" in data and "data" in data["records"]:
