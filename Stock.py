@@ -62,17 +62,17 @@ def fetch_stock_news_moneycontrol(ticker):
 # Fetch options data from NSE API
 def fetch_options_data_nse(symbol="RELIANCE"):
     try:
-        url = "https://www1.nseindia.com/live_market/dynaContent/live_watch/get_quote/ajaxFOGetQuoteJSON.jsp"
-        params = {"underlying": symbol, "instrument": "OPTSTK", "type": "SELECT", "strike": "SELECT", "expiry": "SELECT"}
-        headers = {
+        session = requests.Session()
+        session.headers.update({
             "User-Agent": "Mozilla/5.0",
             "X-Requested-With": "XMLHttpRequest",
-            "Host": "www1.nseindia.com",
-            "Referer": f"https://www1.nseindia.com/live_market/dynaContent/live_watch/get_quote/GetQuoteFO.jsp?underlying={symbol}&instrument=OPTSTK&type=SELECT&strike=SELECT&expiry=SELECT"
-        }
-        session = requests.Session()
-        session.get("https://www1.nseindia.com", headers=headers)  # Establish session
-        response = session.get(url, headers=headers, params=params)
+            "Referer": "https://www.nseindia.com"
+        })
+        session.get("https://www.nseindia.com")  # Establish session
+
+        url = "https://www.nseindia.com/api/option-chain-equities"
+        params = {"symbol": symbol}
+        response = session.get(url, params=params)
         
         if response.status_code != 200:
             st.error(f"Error fetching options data: HTTP {response.status_code}")
