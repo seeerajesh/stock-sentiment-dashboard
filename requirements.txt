@@ -6,3 +6,4 @@ nsepy
 smartapi-python
 logzero
 websocket-client
+pyotp
