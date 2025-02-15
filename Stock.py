@@ -2,15 +2,27 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 import requests
-from textblob import TextBlob
 import datetime
-from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
+
+# Set up Selenium WebDriver to fetch session cookies
+def get_nse_session():
+    options = Options()
+    options.headless = True
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service, options=options)
+    driver.get("https://www.nseindia.com")
+    cookies = {c["name"]: c["value"] for c in driver.get_cookies()}
+    driver.quit()
+    return cookies
 
 # Fetch stock data
 def fetch_stock_data():
     try:
         stock_data = []
-        today = datetime.date.today()
         nifty500_tickers = ["RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK"]  # Replace with actual top 300 stocks
 
         for ticker in nifty500_tickers[:300]:  # Limiting to 300 stocks
@@ -38,37 +50,18 @@ def fetch_stock_data():
         st.error(f"Error fetching stock data: {e}")
         return pd.DataFrame()
 
-# Fetch stock-related news from Moneycontrol
-def fetch_stock_news_moneycontrol(ticker):
-    try:
-        url = f"https://www.moneycontrol.com/news/tags/{ticker}.html"
-        response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-        soup = BeautifulSoup(response.text, 'html.parser')
-
-        articles = []
-        for news in soup.find_all('li', class_='clearfix')[:5]:
-            title_tag = news.find('h2')
-            link_tag = news.find('a')
-            if title_tag and link_tag:
-                title = title_tag.text.strip()
-                link = link_tag['href']
-                articles.append({"Stock": ticker, "Title": title, "URL": link})
-
-        return pd.DataFrame(articles)
-    except Exception as e:
-        st.error(f"Error fetching news data for {ticker}: {e}")
-        return pd.DataFrame()
-
 # Fetch options data from NSE API
 def fetch_options_data_nse(symbol="RELIANCE"):
     try:
+        cookies = get_nse_session()
         session = requests.Session()
         session.headers.update({
             "User-Agent": "Mozilla/5.0",
             "X-Requested-With": "XMLHttpRequest",
             "Referer": "https://www.nseindia.com"
         })
-        session.get("https://www.nseindia.com")  # Establish session
+        for key, value in cookies.items():
+            session.cookies.set(key, value)
 
         url = "https://www.nseindia.com/api/option-chain-equities"
         params = {"symbol": symbol}
@@ -80,33 +73,44 @@ def fetch_options_data_nse(symbol="RELIANCE"):
         
         data = response.json()
         
+        if "records" not in data or "data" not in data["records"]:
+            st.error("Unexpected response format from NSE API")
+            return pd.DataFrame()
+        
         options_data = []
-        if "records" in data and "data" in data["records"]:
-            for option in data["records"]["data"]:
-                ce_data = option.get("CE", {})
-                pe_data = option.get("PE", {})
-                
-                if ce_data:
-                    historical_prices = fetch_historical_option_prices(symbol, ce_data.get("strikePrice"), "CE")
-                    options_data.append({
-                        "Stock": symbol,
-                        "Option Type": "CE",
-                        "Expiry Date": ce_data.get("expiryDate", "N/A"),
-                        "Strike Price": ce_data.get("strikePrice", "N/A"),
-                        "Last Traded Price": ce_data.get("lastPrice", "N/A"),
-                        "5-Day Prices": historical_prices
-                    })
-                
-                if pe_data:
-                    historical_prices = fetch_historical_option_prices(symbol, pe_data.get("strikePrice"), "PE")
-                    options_data.append({
-                        "Stock": symbol,
-                        "Option Type": "PE",
-                        "Expiry Date": pe_data.get("expiryDate", "N/A"),
-                        "Strike Price": pe_data.get("strikePrice", "N/A"),
-                        "Last Traded Price": pe_data.get("lastPrice", "N/A"),
-                        "5-Day Prices": historical_prices
-                    })
+        for option in data["records"]["data"]:
+            ce_data = option.get("CE", {})
+            pe_data = option.get("PE", {})
+            
+            if ce_data:
+                historical_prices = fetch_historical_option_prices(symbol, ce_data.get("strikePrice"), "CE")
+                options_data.append({
+                    "Stock": symbol,
+                    "Option Type": "CE",
+                    "Expiry Date": ce_data.get("expiryDate", "N/A"),
+                    "Strike Price": ce_data.get("strikePrice", "N/A"),
+                    "Last Traded Price": ce_data.get("lastPrice", "N/A"),
+                    "D-5": historical_prices.get("D-5", "N/A"),
+                    "D-4": historical_prices.get("D-4", "N/A"),
+                    "D-3": historical_prices.get("D-3", "N/A"),
+                    "D-2": historical_prices.get("D-2", "N/A"),
+                    "D-1": historical_prices.get("D-1", "N/A"),
+                })
+            
+            if pe_data:
+                historical_prices = fetch_historical_option_prices(symbol, pe_data.get("strikePrice"), "PE")
+                options_data.append({
+                    "Stock": symbol,
+                    "Option Type": "PE",
+                    "Expiry Date": pe_data.get("expiryDate", "N/A"),
+                    "Strike Price": pe_data.get("strikePrice", "N/A"),
+                    "Last Traded Price": pe_data.get("lastPrice", "N/A"),
+                    "D-5": historical_prices.get("D-5", "N/A"),
+                    "D-4": historical_prices.get("D-4", "N/A"),
+                    "D-3": historical_prices.get("D-3", "N/A"),
+                    "D-2": historical_prices.get("D-2", "N/A"),
+                    "D-1": historical_prices.get("D-1", "N/A"),
+                })
         
         return pd.DataFrame(options_data) if options_data else pd.DataFrame()
     except Exception as e:
@@ -119,10 +123,11 @@ def fetch_historical_option_prices(symbol, strike_price, option_type):
         stock = yf.Ticker(f"{symbol}.NS")
         hist = stock.history(period="5d")
         if not hist.empty:
-            return list(hist["Close"][-5:].values)
+            prices = hist["Close"][-5:].tolist()
+            return {f"D-{i+1}": prices[i] for i in range(len(prices))}
     except Exception as e:
         st.error(f"Error fetching historical option prices: {e}")
-    return []
+    return {}
 
 # Streamlit UI Setup
 st.title("Stock Sentiment Dashboard")
@@ -133,22 +138,6 @@ if not df.empty:
     df_sorted = df.sort_values(by='Stock', ascending=True).head(20)
     st.dataframe(df_sorted)
 
-    st.sidebar.header("Filters")
-    selected_stock = st.sidebar.selectbox("Select Stock", ['All'] + list(df['Stock'].unique()))
-    if selected_stock != 'All':
-        df_sorted = df_sorted[df_sorted['Stock'] == selected_stock]
-
-    st.write("### Filtered Stocks")
-    st.dataframe(df_sorted)
-
-    # Fetch and display news data
-    st.write("### Stock News")
-    news_df = pd.concat([fetch_stock_news_moneycontrol(ticker) for ticker in df['Stock'].unique()])
-    if not news_df.empty:
-        st.dataframe(news_df)
-    else:
-        st.warning("No news available for selected stocks.")
-    
     # Fetch and display options data from NSE
     st.write("### Options Data (NSE API)")
     options_df = fetch_options_data_nse()
