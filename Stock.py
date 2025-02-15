@@ -87,25 +87,42 @@ def fetch_options_data_nse(symbol="RELIANCE"):
                 pe_data = option.get("PE", {})
                 
                 if ce_data:
+                    historical_prices = fetch_historical_option_prices(symbol, ce_data.get("strikePrice"), "CE")
                     options_data.append({
                         "Stock": symbol,
                         "Option Type": "CE",
                         "Expiry Date": ce_data.get("expiryDate", "N/A"),
-                        "Strike Price": ce_data.get("strikePrice", "N/A")
+                        "Strike Price": ce_data.get("strikePrice", "N/A"),
+                        "Last Traded Price": ce_data.get("lastPrice", "N/A"),
+                        "5-Day Prices": historical_prices
                     })
                 
                 if pe_data:
+                    historical_prices = fetch_historical_option_prices(symbol, pe_data.get("strikePrice"), "PE")
                     options_data.append({
                         "Stock": symbol,
                         "Option Type": "PE",
                         "Expiry Date": pe_data.get("expiryDate", "N/A"),
-                        "Strike Price": pe_data.get("strikePrice", "N/A")
+                        "Strike Price": pe_data.get("strikePrice", "N/A"),
+                        "Last Traded Price": pe_data.get("lastPrice", "N/A"),
+                        "5-Day Prices": historical_prices
                     })
         
         return pd.DataFrame(options_data) if options_data else pd.DataFrame()
     except Exception as e:
         st.error(f"Error fetching options data from NSE: {e}")
         return pd.DataFrame()
+
+# Fetch historical option prices
+def fetch_historical_option_prices(symbol, strike_price, option_type):
+    try:
+        stock = yf.Ticker(f"{symbol}.NS")
+        hist = stock.history(period="5d")
+        if not hist.empty:
+            return list(hist["Close"][-5:].values)
+    except Exception as e:
+        st.error(f"Error fetching historical option prices: {e}")
+    return []
 
 # Streamlit UI Setup
 st.title("Stock Sentiment Dashboard")
