@@ -4,13 +4,12 @@ import yfinance as yf
 import requests
 import datetime
 
-# Function to fetch stock data
 def fetch_stock_data():
     try:
         stock_data = []
         nifty500_tickers = ["RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK"]  # Replace with actual top 300 stocks
 
-        for ticker in nifty500_tickers[:300]:  # Limiting to 300 stocks
+        for ticker in nifty500_tickers[:300]:
             stock = yf.Ticker(ticker + ".NS")
             hist = stock.history(period="1y")
 
@@ -35,7 +34,6 @@ def fetch_stock_data():
         st.error(f"Error fetching stock data: {e}")
         return pd.DataFrame()
 
-# Fetch options data from NSE API (without Selenium)
 def fetch_options_data_nse(symbol="RELIANCE"):
     try:
         session = requests.Session()
@@ -98,7 +96,6 @@ def fetch_options_data_nse(symbol="RELIANCE"):
         st.error(f"Error fetching options data from NSE: {e}")
         return pd.DataFrame()
 
-# Fetch historical option prices (Placeholder, needs a working data source)
 def fetch_historical_option_prices(symbol, strike_price, option_type):
     try:
         stock = yf.Ticker(f"{symbol}.NS")
@@ -110,7 +107,6 @@ def fetch_historical_option_prices(symbol, strike_price, option_type):
         st.error(f"Error fetching historical option prices: {e}")
     return {}
 
-# Streamlit UI Setup
 st.title("Stock Sentiment Dashboard")
 
 df = fetch_stock_data()
@@ -119,7 +115,6 @@ if not df.empty:
     df_sorted = df.sort_values(by='Stock', ascending=True).head(20)
     st.dataframe(df_sorted)
 
-    # Fetch and display options data from NSE
     st.write("### Options Data (NSE API)")
     options_df = fetch_options_data_nse()
     if not options_df.empty:
