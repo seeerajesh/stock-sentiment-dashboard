@@ -3,6 +3,7 @@ import pandas as pd
 import yfinance as yf
 import requests
 import datetime
+from bs4 import BeautifulSoup
 
 def fetch_stock_data():
     try:
@@ -69,11 +70,7 @@ def fetch_options_data_nse(symbol="RELIANCE"):
                     "Expiry Date": ce_data.get("expiryDate", "N/A"),
                     "Strike Price": ce_data.get("strikePrice", "N/A"),
                     "Last Traded Price": ce_data.get("lastPrice", "N/A"),
-                    "D-5": historical_prices.get("D-5", "N/A"),
-                    "D-4": historical_prices.get("D-4", "N/A"),
-                    "D-3": historical_prices.get("D-3", "N/A"),
-                    "D-2": historical_prices.get("D-2", "N/A"),
-                    "D-1": historical_prices.get("D-1", "N/A"),
+                    **historical_prices
                 })
             
             if pe_data:
@@ -84,11 +81,7 @@ def fetch_options_data_nse(symbol="RELIANCE"):
                     "Expiry Date": pe_data.get("expiryDate", "N/A"),
                     "Strike Price": pe_data.get("strikePrice", "N/A"),
                     "Last Traded Price": pe_data.get("lastPrice", "N/A"),
-                    "D-5": historical_prices.get("D-5", "N/A"),
-                    "D-4": historical_prices.get("D-4", "N/A"),
-                    "D-3": historical_prices.get("D-3", "N/A"),
-                    "D-2": historical_prices.get("D-2", "N/A"),
-                    "D-1": historical_prices.get("D-1", "N/A"),
+                    **historical_prices
                 })
         
         return pd.DataFrame(options_data) if options_data else pd.DataFrame()
@@ -102,26 +95,27 @@ def fetch_historical_option_prices(symbol, strike_price, option_type):
         hist = stock.history(period="5d")
         if not hist.empty:
             prices = hist["Close"][-5:].tolist()
-            return {f"D-{i+1}": prices[i] for i in range(len(prices))}
+            return {f"D-{5-i}": prices[i] for i in range(len(prices))}
     except Exception as e:
         st.error(f"Error fetching historical option prices: {e}")
     return {}
 
 def fetch_news():
     try:
-        url = "https://newsapi.org/v2/top-headlines"
-        params = {
-            "country": "in",
-            "category": "business",
-            "apiKey": "your_newsapi_key"
-        }
-        response = requests.get(url, params=params)
-        if response.status_code == 200:
-            articles = response.json().get("articles", [])
-            return pd.DataFrame(articles)[["title", "description", "url"]]
-        else:
-            st.error("Error fetching news")
-            return pd.DataFrame()
+        url = "https://news.google.com/rss/search?q=India+stock+market&hl=en-IN&gl=IN&ceid=IN:en"
+        response = requests.get(url)
+        soup = BeautifulSoup(response.content, "xml")
+        items = soup.find_all("item")
+
+        news_data = []
+        for item in items[:10]:
+            news_data.append({
+                "Title": item.title.text,
+                "Link": item.link.text,
+                "Publication Date": item.pubDate.text
+            })
+
+        return pd.DataFrame(news_data)
     except Exception as e:
         st.error(f"Error fetching news: {e}")
         return pd.DataFrame()
