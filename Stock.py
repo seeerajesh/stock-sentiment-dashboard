@@ -107,10 +107,28 @@ def fetch_historical_option_prices(symbol, strike_price, option_type):
         st.error(f"Error fetching historical option prices: {e}")
     return {}
 
+def fetch_news():
+    try:
+        url = "https://newsapi.org/v2/top-headlines"
+        params = {
+            "country": "in",
+            "category": "business",
+            "apiKey": "your_newsapi_key"
+        }
+        response = requests.get(url, params=params)
+        if response.status_code == 200:
+            articles = response.json().get("articles", [])
+            return pd.DataFrame(articles)[["title", "description", "url"]]
+        else:
+            st.error("Error fetching news")
+            return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Error fetching news: {e}")
+        return pd.DataFrame()
+
 st.title("Stock Sentiment Dashboard")
 
 df = fetch_stock_data()
-
 if not df.empty:
     df_sorted = df.sort_values(by='Stock', ascending=True).head(20)
     st.dataframe(df_sorted)
@@ -121,5 +139,12 @@ if not df.empty:
         st.dataframe(options_df)
     else:
         st.warning("No options data available.")
+
+    st.write("### Market News")
+    news_df = fetch_news()
+    if not news_df.empty:
+        st.dataframe(news_df)
+    else:
+        st.warning("No news available.")
 else:
     st.warning("No stock data available.")
