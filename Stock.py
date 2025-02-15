@@ -3,23 +3,8 @@ import pandas as pd
 import yfinance as yf
 import requests
 import datetime
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
 
-# Set up Selenium WebDriver to fetch session cookies
-def get_nse_session():
-    options = Options()
-    options.headless = True
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=options)
-    driver.get("https://www.nseindia.com")
-    cookies = {c["name"]: c["value"] for c in driver.get_cookies()}
-    driver.quit()
-    return cookies
-
-# Fetch stock data
+# Function to fetch stock data
 def fetch_stock_data():
     try:
         stock_data = []
@@ -50,29 +35,25 @@ def fetch_stock_data():
         st.error(f"Error fetching stock data: {e}")
         return pd.DataFrame()
 
-# Fetch options data from NSE API
+# Fetch options data from NSE API (without Selenium)
 def fetch_options_data_nse(symbol="RELIANCE"):
     try:
-        cookies = get_nse_session()
         session = requests.Session()
         session.headers.update({
-            "User-Agent": "Mozilla/5.0",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
             "X-Requested-With": "XMLHttpRequest",
             "Referer": "https://www.nseindia.com"
         })
-        for key, value in cookies.items():
-            session.cookies.set(key, value)
 
         url = "https://www.nseindia.com/api/option-chain-equities"
         params = {"symbol": symbol}
         response = session.get(url, params=params)
-        
+
         if response.status_code != 200:
             st.error(f"Error fetching options data: HTTP {response.status_code}")
             return pd.DataFrame()
         
         data = response.json()
-        
         if "records" not in data or "data" not in data["records"]:
             st.error("Unexpected response format from NSE API")
             return pd.DataFrame()
@@ -81,7 +62,7 @@ def fetch_options_data_nse(symbol="RELIANCE"):
         for option in data["records"]["data"]:
             ce_data = option.get("CE", {})
             pe_data = option.get("PE", {})
-            
+
             if ce_data:
                 historical_prices = fetch_historical_option_prices(symbol, ce_data.get("strikePrice"), "CE")
                 options_data.append({
@@ -117,7 +98,7 @@ def fetch_options_data_nse(symbol="RELIANCE"):
         st.error(f"Error fetching options data from NSE: {e}")
         return pd.DataFrame()
 
-# Fetch historical option prices
+# Fetch historical option prices (Placeholder, needs a working data source)
 def fetch_historical_option_prices(symbol, strike_price, option_type):
     try:
         stock = yf.Ticker(f"{symbol}.NS")
